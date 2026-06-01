@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, type RefObject } from "react";
-import { SUPPORTED_FORMATS_LABEL } from "@/lib/constants";
+import { useState, useCallback } from "react";
+import type { RefObject } from "react";
 
 interface UploadEntry {
   file: File;
@@ -23,41 +23,44 @@ export function DocumentUploader({ onUpload, uploads, inputRef }: DocumentUpload
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragOver(false);
-      const files = Array.from(e.dataTransfer.files);
-      files.forEach((f) => onUpload(f));
+      if (e.dataTransfer.files) {
+        Array.from(e.dataTransfer.files).forEach((f) => onUpload(f));
+      }
     },
     [onUpload]
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      files.forEach((f) => onUpload(f));
+      if (e.target.files) {
+        Array.from(e.target.files).forEach((f) => onUpload(f));
+      }
       if (inputRef.current) inputRef.current.value = "";
     },
     [onUpload, inputRef]
   );
 
   return (
-    <div className="mb-2">
+    <div className="mb-3">
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`
-          border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs
+          border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all text-xs
           ${isDragOver
-            ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20"
-            : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+            ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 drop-glow"
+            : "border-slate-300 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/50"
           }
         `}
       >
-        <p className="text-gray-500 dark:text-gray-400">
-          📤 Drop files or click
+        <div className="text-2xl mb-1">📤</div>
+        <p className="text-slate-600 dark:text-slate-400 font-medium">
+          Drop files or click to upload
         </p>
-        <p className="text-gray-400 dark:text-gray-500 text-[10px] mt-0.5">
-          {SUPPORTED_FORMATS_LABEL}
+        <p className="text-slate-400 dark:text-slate-500 text-[10px] mt-1">
+          PDF, DOCX, TXT · Max 50MB
         </p>
       </div>
       <input
@@ -71,31 +74,14 @@ export function DocumentUploader({ onUpload, uploads, inputRef }: DocumentUpload
 
       {/* Upload progress */}
       {uploads.length > 0 && (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1.5">
           {uploads.map((u) => (
-            <div key={u.file.name} className="text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400 truncate max-w-[180px]">
-                  {u.file.name}
-                </span>
-                <span
-                  className={`flex-shrink-0 ml-2 ${
-                    u.status === "ready"
-                      ? "text-green-500"
-                      : u.status === "error"
-                      ? "text-red-500"
-                      : "text-blue-500"
-                  }`}
-                >
-                  {u.status === "uploading" ? "⏳" : ""}
-                  {u.status === "processing" ? "⚙️" : ""}
-                  {u.status === "ready" ? "✅" : ""}
-                  {u.status === "error" ? "❌" : ""}
-                </span>
-              </div>
-              {u.error && (
-                <p className="text-red-500 text-[10px] mt-0.5 truncate">{u.error}</p>
-              )}
+            <div key={u.file.name} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs">
+              <span className="text-sm flex-shrink-0">
+                {u.status === "uploading" ? "⏳" : u.status === "processing" ? "⚙️" : u.status === "ready" ? "✅" : "❌"}
+              </span>
+              <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{u.file.name}</span>
+              {u.error && <span className="text-red-500 text-[10px] truncate max-w-[100px]">{u.error}</span>}
             </div>
           ))}
         </div>
