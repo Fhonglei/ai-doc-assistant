@@ -105,16 +105,38 @@ Only output the JSON."""
 
 
 def _parse_json(content: str) -> Optional[List[dict]]:
+    """Parse JSON array from LLM output, handling various formats including code blocks."""
     try:
         return json.loads(content)
     except json.JSONDecodeError:
         pass
+
     import re
-    for pattern in [r"```(?:json)?\s*(\[.*?\])\s*```", r"\[.*\]"]:
-        m = re.search(pattern, content, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(1) if "```" in pattern else m.group(0))
-            except json.JSONDecodeError:
-                pass
+
+    # Try fenced code block first
+    m = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", content, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Find the LAST JSON array (avoid greedy match that captures citation [N] markers)
+    # Strategy: find last '[' and matching ']', extract, try to parse
+    last_open = content.rfind("[{")
+    last_close = content.rfind("}]")
+    if last_open >= 0 and last_close > last_open:
+        try:
+            return json.loads(content[last_open:last_close + 2])
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: find any [{ ... }] pattern
+    m = re.search(r"\[\s*\{.*?\}\s*\]", content, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+
     return None

@@ -8,13 +8,21 @@ from config import settings
 from app.models.document import DocumentOut
 from app.models.chat import MessageOut, ConversationOut, ConversationListItem, Source
 
+# Module-level singleton connection — created once, reused for all operations
+_db: Optional[aiosqlite.Connection] = None
+
 
 async def _get_db() -> aiosqlite.Connection:
-    """Get an async SQLite connection."""
-    os.makedirs(os.path.dirname(settings.metadata_db_path) or ".", exist_ok=True)
-    db = await aiosqlite.connect(settings.metadata_db_path)
-    db.row_factory = aiosqlite.Row
-    return db
+    """Get the shared SQLite connection (created on first call)."""
+    global _db
+    if _db is None:
+        os.makedirs(os.path.dirname(settings.metadata_db_path) or ".", exist_ok=True)
+        _db = await aiosqlite.connect(settings.metadata_db_path, timeout=10)
+        _db.row_factory = aiosqlite.Row
+        # Enable WAL mode for better concurrent read/write performance
+        await _db.execute("PRAGMA journal_mode=WAL")
+        await _db.execute("PRAGMA busy_timeout=5000")
+    return _db
 
 
 async def init_db():
@@ -53,8 +61,6 @@ async def init_db():
                 ON messages(conversation_id, created_at);
         """)
         await db.commit()
-    finally:
-        await db.close()
 
 
 # --- Document operations ---
@@ -70,8 +76,6 @@ async def insert_document(doc: DocumentOut) -> DocumentOut:
              doc.chunk_count, doc.status, doc.created_at, doc.error_message),
         )
         await db.commit()
-    finally:
-        await db.close()
     return doc
 
 
@@ -82,8 +86,6 @@ async def get_document(doc_id: str) -> Optional[DocumentOut]:
             row = await cursor.fetchone()
             if row:
                 return DocumentOut(**dict(row))
-    finally:
-        await db.close()
     return None
 
 
@@ -95,8 +97,6 @@ async def list_documents() -> List[DocumentOut]:
         ) as cursor:
             rows = await cursor.fetchall()
             return [DocumentOut(**dict(r)) for r in rows]
-    finally:
-        await db.close()
 
 
 async def update_document_status(doc_id: str, status: str, error_message: Optional[str] = None):
@@ -107,8 +107,6 @@ async def update_document_status(doc_id: str, status: str, error_message: Option
             (status, error_message, doc_id),
         )
         await db.commit()
-    finally:
-        await db.close()
 
 
 async def update_document_chunk_count(doc_id: str, chunk_count: int):
@@ -119,8 +117,6 @@ async def update_document_chunk_count(doc_id: str, chunk_count: int):
             (chunk_count, doc_id),
         )
         await db.commit()
-    finally:
-        await db.close()
 
 
 async def delete_document(doc_id: str) -> bool:
@@ -129,8 +125,6 @@ async def delete_document(doc_id: str) -> bool:
         cursor = await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
         await db.commit()
         return cursor.rowcount > 0
-    finally:
-        await db.close()
 
 
 # --- Conversation operations ---
@@ -143,8 +137,6 @@ async def create_conversation(conv_id: str, created_at: str) -> dict:
             (conv_id, created_at),
         )
         await db.commit()
-    finally:
-        await db.close()
     return {"conversation_id": conv_id, "title": None, "created_at": created_at}
 
 
@@ -168,8 +160,6 @@ async def list_conversations() -> List[ConversationListItem]:
                 )
                 for r in rows
             ]
-    finally:
-        await db.close()
 
 
 async def get_conversation(conv_id: str) -> Optional[ConversationOut]:
@@ -212,8 +202,6 @@ async def get_conversation(conv_id: str) -> Optional[ConversationOut]:
             created_at=row["created_at"],
             messages=messages,
         )
-    finally:
-        await db.close()
 
 
 async def add_message(
@@ -251,8 +239,6 @@ async def add_message(
                     )
 
         await db.commit()
-    finally:
-        await db.close()
 
 
 async def delete_conversation(conv_id: str) -> bool:
@@ -262,5 +248,3 @@ async def delete_conversation(conv_id: str) -> bool:
         cursor = await db.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
         await db.commit()
         return cursor.rowcount > 0
-    finally:
-        await db.close()

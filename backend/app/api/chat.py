@@ -24,8 +24,11 @@ from app.db.metadata_store import (
     create_conversation,
     add_message,
 )
+from config import settings
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
+
+MAX_QUERY_LENGTH = 4000
 
 
 @router.post("/send")
@@ -34,6 +37,13 @@ async def send_message(request: ChatRequest):
     # Validate
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
+    if len(request.query) > MAX_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Query too long ({len(request.query)} chars). Max: {MAX_QUERY_LENGTH}.",
+        )
+    if not settings.deepseek_api_key and not settings.openai_api_key:
+        raise HTTPException(status_code=503, detail="No LLM API key configured.")
 
     # Get or create conversation
     conv_id = request.conversation_id or str(uuid.uuid4())

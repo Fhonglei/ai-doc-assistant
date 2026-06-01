@@ -1,20 +1,22 @@
 """AI Document Assistant — FastAPI Application Entry Point."""
 
 import os
+import logging
 from contextlib import asynccontextmanager
 
-# Set HuggingFace mirror BEFORE any ChromaDB imports (for users in China)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Set HuggingFace mirror BEFORE any HuggingFace imports (for users in China)
 if os.environ.get("HF_ENDPOINT"):
-    pass  # Already set by user
+    pass
 elif os.path.exists(".env"):
-    # Read HF_ENDPOINT from .env early, before ChromaDB initializes
     try:
         with open(".env") as f:
             for line in f:
                 line = line.strip()
                 if line.startswith("HF_ENDPOINT="):
-                    val = line.split("=", 1)[1].strip()
-                    os.environ["HF_ENDPOINT"] = val
+                    os.environ["HF_ENDPOINT"] = line.split("=", 1)[1].strip()
                     break
     except Exception:
         pass
@@ -29,9 +31,21 @@ from app.utils.exception_handlers import value_error_handler, generic_exception_
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events."""
+    """Startup: init DB and preload embedding model."""
+    logger.info("Initializing database...")
     await init_db()
+
+    logger.info("Loading embedding model (first request will be instant)...")
+    try:
+        import asyncio
+        from app.core.embedder import embed_query
+        await embed_query("warmup")  # Eager-load the model
+        logger.info("Embedding model ready.")
+    except Exception as e:
+        logger.warning(f"Embedding model not preloaded (will load on first request): {e}")
+
     yield
+    logger.info("Shutting down...")
 
 
 app = FastAPI(

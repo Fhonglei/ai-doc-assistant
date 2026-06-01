@@ -1,10 +1,12 @@
 """ChromaDB vector store — stores pre-computed embeddings (no auto-embed)."""
 
 import os
+import logging
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from config import settings
 
+logger = logging.getLogger(__name__)
 
 _collection = None
 _client = None
@@ -59,25 +61,34 @@ def query_by_embedding(
     document_ids: list[str] | None = None,
     n_results: int = 10,
 ) -> dict:
-    """Query by pre-computed embedding vector."""
+    """Query by pre-computed embedding vector. Returns empty result if collection is empty."""
     collection = get_collection()
+    count = collection.count()
+
+    # Guard: ChromaDB rejects n_results=0 with TypeError
+    if count == 0:
+        return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+
     where_filter = {"document_id": {"$in": document_ids}} if document_ids else None
+    actual_n = max(1, min(n_results, count))
 
     return collection.query(
         query_embeddings=[query_embedding],
-        n_results=min(n_results, collection.count()),
+        n_results=actual_n,
         where=where_filter,
         include=["documents", "metadatas", "distances"],
     )
 
 
 def delete_document_chunks(document_id: str) -> int:
+    """Delete all chunks for a document. Returns count deleted, or raises on storage error."""
     collection = get_collection()
     try:
         results = collection.get(where={"document_id": document_id})
         if results["ids"]:
             collection.delete(ids=results["ids"])
             return len(results["ids"])
-    except Exception:
-        pass
-    return 0
+        return 0
+    except Exception as e:
+        logger.error(f"Failed to delete chunks for document {document_id}: {e}")
+        raise  # Don't swallow storage errors — let the caller decide
