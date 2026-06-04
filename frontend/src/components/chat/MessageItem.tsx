@@ -21,7 +21,7 @@ export function MessageItem({ message, sources }: MessageItemProps) {
     return parts.map((part, i) => {
       const match = part.match(/^\[(\d+)\]$/);
       if (match && sources && sources.length > 0) {
-        const idx = parseInt(match[1]) - 1;
+        const idx = parseInt(match[1], 10) - 1;
         return (
           <CitationBadge key={`cite-${i}`} index={idx} sources={sources} />
         );
@@ -30,35 +30,42 @@ export function MessageItem({ message, sources }: MessageItemProps) {
     });
   }, [message.content, isUser, sources]);
 
+  const time = new Date(message.timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
-    <div className="msg-enter flex gap-4 px-5 py-4">
-      {/* Avatar */}
+    <div
+      className={`msg-enter flex gap-3 px-4 py-3 ${
+        isUser ? "flex-row-reverse" : ""
+      }`}
+    >
       <div
-        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold shadow-sm ${
-          isUser
-            ? "bg-gradient-to-br from-indigo-400 to-indigo-600 text-white"
-            : "bg-gradient-to-br from-emerald-400 to-teal-500 text-white"
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white ${
+          isUser ? "bg-slate-600" : "bg-accent"
         }`}
       >
-        {isUser ? "U" : "AI"}
+        {isUser ? "我" : "AI"}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-            {isUser ? "You" : "Assistant"}
+      <div className={`min-w-0 flex-1 ${isUser ? "flex flex-col items-end" : ""}`}>
+        <div
+          className={`mb-1 flex items-center gap-2 text-[10px] text-muted ${
+            isUser ? "flex-row-reverse" : ""
+          }`}
+        >
+          <span className="font-medium text-secondary">
+            {isUser ? "你" : "助手"}
           </span>
-          <span className="text-[10px] text-slate-400">
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
+          <span>{time}</span>
         </div>
 
         <div
           className={`text-sm leading-relaxed ${
             isUser
-              ? "bg-indigo-50 dark:bg-indigo-900/10 text-slate-800 dark:text-slate-200 rounded-2xl rounded-tl-md px-4 py-3 inline-block max-w-[85%]"
-              : "text-slate-700 dark:text-slate-300 prose dark:prose-invert prose-sm max-w-none"
+              ? "max-w-[85%] rounded-2xl rounded-tr-md bg-accent px-4 py-3 text-white"
+              : "prose prose-sm dark:prose-invert max-w-none text-primary"
           }`}
         >
           {isUser ? (
@@ -68,7 +75,6 @@ export function MessageItem({ message, sources }: MessageItemProps) {
           )}
         </div>
 
-        {/* Source bar (AI messages only) */}
         {!isUser && sources && sources.length > 0 && (
           <SourceBar sources={sources} />
         )}

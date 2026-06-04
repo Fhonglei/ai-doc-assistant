@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { IconSend } from "@/components/common/Icons";
+import { useDocumentStore } from "@/stores/document-store";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -11,12 +13,13 @@ interface ChatInputProps {
 export function ChatInput({ onSend, onStop, isStreaming }: ChatInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const selectedCount = useDocumentStore((s) => s.selectedDocumentIds.length);
 
   useEffect(() => {
     const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.style.height = Math.min(el.scrollHeight, 160) + "px";
     }
   }, [input]);
 
@@ -40,41 +43,49 @@ export function ChatInput({ onSend, onStop, isStreaming }: ChatInputProps) {
   const hasText = input.trim().length > 0;
 
   return (
-    <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-3 bg-slate-100 dark:bg-slate-800 rounded-2xl p-2 border border-slate-200 dark:border-slate-700 focus-within:border-indigo-400 dark:focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900/30 transition-all">
+    <div className="shrink-0 border-t border-subtle bg-surface-elevated/90 p-4 backdrop-blur-sm">
+      <div className="mx-auto max-w-3xl">
+        {selectedCount > 0 && (
+          <p className="mb-2 text-center text-[10px] text-muted">
+            检索范围：已选 {selectedCount} 个文档
+          </p>
+        )}
+        <div className="flex items-end gap-2 rounded-2xl border border-subtle bg-surface-muted p-2 transition focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-glow)]">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your documents..."
+            placeholder="输入问题，基于已上传文档回答…"
             rows={1}
-            className="flex-1 resize-none bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+            className="max-h-40 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none"
           />
           {isStreaming ? (
             <button
+              type="button"
               onClick={onStop}
-              className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all text-sm font-medium flex-shrink-0 shadow-sm"
+              className="shrink-0 rounded-xl bg-[var(--danger)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
             >
-              ⬛ Stop
+              停止
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={!hasText}
-              className={`px-4 py-2 rounded-xl transition-all text-sm font-medium flex-shrink-0 shadow-sm ${
+              aria-label="发送"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
                 hasText
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
-                  : "bg-slate-300 dark:bg-slate-600 text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                  ? "bg-accent text-white hover:opacity-90 active:scale-95"
+                  : "bg-surface-inset text-muted cursor-not-allowed"
               }`}
             >
-              ➤ Send
+              <IconSend className="h-4 w-4" />
             </button>
           )}
         </div>
-        <p className="text-[10px] text-slate-400 text-center mt-2">
-          Press Enter to send · Shift+Enter for new line
+        <p className="mt-2 text-center text-[10px] text-muted">
+          Enter 发送 · Shift+Enter 换行
         </p>
       </div>
     </div>

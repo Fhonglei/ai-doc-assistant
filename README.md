@@ -12,8 +12,9 @@
 - **📎 Source Citations** — Inline `[1]` `[2]` citation badges that expand to show source text
 - **📚 Multi-Document Queries** — Ask questions across multiple documents simultaneously
 - **💾 Conversation History** — All chats saved with automatic title generation
-- **🌙 Dark Mode** — Full light/dark theme support
-- **📱 Responsive** — Works on desktop and mobile
+- **🌙 Dark Mode** — Toggle light/dark theme (persisted)
+- **📱 Responsive** — Three-panel layout with mobile drawers
+- **🎯 Scoped Search** — Select specific documents or search all
 
 ## 🏗️ Architecture
 
@@ -41,8 +42,8 @@
 ```bash
 cd backend
 pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your API keys
+cp .env.example .env   # or place .env in repo root
+# Edit .env with your DEEPSEEK_API_KEY
 python main.py
 ```
 

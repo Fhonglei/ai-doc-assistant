@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/common/ThemeProvider";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "AI Document Assistant",
-  description: "Upload documents and ask questions — powered by RAG and LLMs",
+  description: "Upload documents and ask questions — RAG-powered Q&A with citations",
 };
 
 export default function RootLayout({
@@ -12,9 +20,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased">
-        {children}
+    <html lang="zh-CN" className={`h-full ${dmSans.variable}`} suppressHydrationWarning>
+      <body className="h-full overflow-hidden">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

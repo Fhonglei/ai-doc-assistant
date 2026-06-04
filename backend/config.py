@@ -1,7 +1,16 @@
 """Application configuration via environment variables."""
 
+from pathlib import Path
 from pydantic_settings import BaseSettings
-from typing import Optional
+
+_BACKEND_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _BACKEND_DIR.parent
+
+
+def _env_file_paths() -> tuple[str, ...]:
+    paths = (_PROJECT_ROOT / ".env", _BACKEND_DIR / ".env")
+    existing = tuple(str(p) for p in paths if p.exists())
+    return existing or (str(_BACKEND_DIR / ".env"),)
 
 
 class Settings(BaseSettings):
@@ -33,7 +42,11 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "info"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "allow"}
+    model_config = {
+        "env_file": _env_file_paths(),
+        "env_file_encoding": "utf-8",
+        "extra": "allow",
+    }
 
 
 settings = Settings()

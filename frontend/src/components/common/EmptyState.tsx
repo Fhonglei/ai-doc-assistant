@@ -1,45 +1,45 @@
-export function EmptyState() {
+"use client";
+
+import { IconSparkles } from "@/components/common/Icons";
+
+const SUGGESTIONS = [
+  "总结文档的核心观点和结论",
+  "列出文档中的关键数据与指标",
+  "文档里有哪些待办事项或建议？",
+  "用三条要点概括全文内容",
+];
+
+interface EmptyStateProps {
+  onSelectPrompt?: (text: string) => void;
+}
+
+export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6 py-16 select-none">
-      {/* Icon */}
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
       <div className="relative mb-8">
-        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
-          <span className="text-5xl">📄</span>
-        </div>
-        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center shadow-md">
-          <span className="text-white text-sm">✨</span>
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-[var(--accent-glow)]">
+          <IconSparkles className="h-10 w-10" />
         </div>
       </div>
 
-      {/* Title */}
-      <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">
-        Ask your documents anything
+      <h2 className="mb-2 text-2xl font-bold tracking-tight text-primary">
+        向你的文档提问
       </h2>
-
-      {/* Description */}
-      <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8 leading-relaxed">
-        Upload PDF, DOCX, or TXT files in the sidebar, then ask questions.
-        AI will search through your documents and answer with cited sources.
+      <p className="mb-10 max-w-md text-sm leading-relaxed text-secondary">
+        在右侧上传 PDF、DOCX 或 TXT，AI 会检索相关内容并给出带引用的回答。
+        可选择特定文档，或留空以搜索全部。
       </p>
 
-      {/* Suggested questions */}
-      <div className="space-y-2 max-w-sm">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-          Try asking
-        </p>
-        {[
-          { icon: "📋", text: "Summarize the main points of the document" },
-          { icon: "🔍", text: "What are the key findings and conclusions?" },
-          { icon: "⚡", text: "Compare the main arguments across all documents" },
-          { icon: "📌", text: "Extract all action items and recommendations" },
-        ].map((q) => (
-          <div
-            key={q.text}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400"
+      <div className="grid w-full max-w-lg gap-2 sm:grid-cols-2">
+        {SUGGESTIONS.map((text) => (
+          <button
+            key={text}
+            type="button"
+            onClick={() => onSelectPrompt?.(text)}
+            className="rounded-xl border border-subtle bg-surface-elevated px-4 py-3 text-left text-sm text-secondary shadow-sm transition hover:border-[var(--accent)] hover:bg-accent-soft hover:text-primary"
           >
-            <span className="text-base flex-shrink-0">{q.icon}</span>
-            <span className="text-left">{q.text}</span>
-          </div>
+            {text}
+          </button>
         ))}
       </div>
     </div>

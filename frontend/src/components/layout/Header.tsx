@@ -1,25 +1,71 @@
+"use client";
+
+import { useTheme } from "@/components/common/ThemeProvider";
+import { IconMenu, IconMoon, IconSun } from "@/components/common/Icons";
+
 interface HeaderProps {
   title?: string;
-  onNewChat?: () => void;
+  backendOk?: boolean | null;
+  onOpenConversations?: () => void;
+  onOpenDocuments?: () => void;
 }
 
-export function Header({ title, onNewChat }: HeaderProps) {
+export function Header({
+  title,
+  backendOk,
+  onOpenConversations,
+  onOpenDocuments,
+}: HeaderProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <header className="flex items-center justify-between h-14 px-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-subtle bg-surface-elevated/80 px-4 backdrop-blur-md">
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenConversations}
+          className="lg:hidden rounded-lg p-2 text-secondary hover:bg-surface-muted"
+          aria-label="打开对话列表"
+        >
+          <IconMenu />
+        </button>
+        <h1 className="truncate text-base font-semibold text-primary">
           {title || "AI Document Assistant"}
         </h1>
-      </div>
-      <div className="flex items-center gap-2">
-        {onNewChat && (
-          <button
-            onClick={onNewChat}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        {backendOk !== null && (
+          <span
+            className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              backendOk
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-red-500/10 text-red-600 dark:text-red-400"
+            }`}
           >
-            + New Chat
-          </button>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                backendOk ? "bg-emerald-500" : "bg-red-500"
+              }`}
+            />
+            {backendOk ? "已连接" : "后端离线"}
+          </span>
         )}
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenDocuments}
+          className="lg:hidden rounded-lg px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent-soft"
+        >
+          文档
+        </button>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="rounded-lg p-2 text-secondary transition hover:bg-surface-muted"
+          aria-label="切换主题"
+        >
+          {theme === "dark" ? <IconSun /> : <IconMoon />}
+        </button>
       </div>
     </header>
   );

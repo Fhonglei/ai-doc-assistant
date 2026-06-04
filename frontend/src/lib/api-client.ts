@@ -12,6 +12,17 @@ import type {
 } from "./types";
 import type { SSEEvent } from "./types";
 
+// --- Health ---
+
+export async function checkHealth(): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/health`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Backend unavailable");
+  return res.json();
+}
+
 // --- Documents ---
 
 export async function uploadDocument(file: File): Promise<Document> {

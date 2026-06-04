@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useChatStore } from "@/stores/chat-store";
+import { useDocumentStore } from "@/stores/document-store";
 import { sendChatMessage } from "@/lib/api-client";
 import type { SSEEvent } from "@/lib/types";
 
@@ -28,6 +29,14 @@ export function useChat() {
     async (query: string, documentIds?: string[] | null) => {
       if (!query.trim() || isStreaming) return;
 
+      const selected = useDocumentStore.getState().selectedDocumentIds;
+      const ids =
+        documentIds !== undefined
+          ? documentIds
+          : selected.length > 0
+            ? selected
+            : null;
+
       addUserMessage(query);
       startStreaming();
 
@@ -36,7 +45,7 @@ export function useChat() {
 
       try {
         await sendChatMessage(
-          { query: query.trim(), document_ids: documentIds, conversation_id: activeConversationId, stream: true },
+          { query: query.trim(), document_ids: ids, conversation_id: activeConversationId, stream: true },
           (event: SSEEvent) => {
             switch (event.type) {
               case "chunk": appendStreamChunk(event.content); break;

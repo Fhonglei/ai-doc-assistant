@@ -43,25 +43,24 @@ export function DocumentUploader({ onUpload, uploads, inputRef }: DocumentUpload
   return (
     <div className="mb-3">
       <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`
-          border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all text-xs
-          ${isDragOver
-            ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 drop-glow"
-            : "border-slate-300 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/50"
-          }
-        `}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+        className={`cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition ${
+          isDragOver
+            ? "drop-glow border-[var(--accent)] bg-accent-soft"
+            : "border-subtle bg-surface-muted/50 hover:border-[var(--accent)]/50"
+        }`}
       >
-        <div className="text-2xl mb-1">📤</div>
-        <p className="text-slate-600 dark:text-slate-400 font-medium">
-          Drop files or click to upload
-        </p>
-        <p className="text-slate-400 dark:text-slate-500 text-[10px] mt-1">
-          PDF, DOCX, TXT · Max 50MB
-        </p>
+        <p className="text-sm font-medium text-primary">拖放文件到此处</p>
+        <p className="mt-1 text-[10px] text-muted">或点击选择 · PDF / DOCX / TXT · 最大 50MB</p>
       </div>
       <input
         ref={inputRef}
@@ -72,19 +71,29 @@ export function DocumentUploader({ onUpload, uploads, inputRef }: DocumentUpload
         multiple
       />
 
-      {/* Upload progress */}
       {uploads.length > 0 && (
-        <div className="mt-2 space-y-1.5">
+        <ul className="mt-2 space-y-1">
           {uploads.map((u) => (
-            <div key={u.file.name} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs">
-              <span className="text-sm flex-shrink-0">
-                {u.status === "uploading" ? "⏳" : u.status === "processing" ? "⚙️" : u.status === "ready" ? "✅" : "❌"}
+            <li
+              key={u.file.name}
+              className="flex items-center gap-2 rounded-lg bg-surface-muted px-2 py-1.5 text-[10px]"
+            >
+              <span className="text-muted">
+                {u.status === "uploading"
+                  ? "↑"
+                  : u.status === "processing"
+                    ? "…"
+                    : u.status === "ready"
+                      ? "✓"
+                      : "!"}
               </span>
-              <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{u.file.name}</span>
-              {u.error && <span className="text-red-500 text-[10px] truncate max-w-[100px]">{u.error}</span>}
-            </div>
+              <span className="min-w-0 flex-1 truncate text-secondary">{u.file.name}</span>
+              {u.error && (
+                <span className="max-w-[80px] truncate text-[var(--danger)]">{u.error}</span>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
