@@ -28,19 +28,29 @@ async def init_db():
     """Create tables if they don't exist."""
     db = await _get_db()
     await db.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS documents (
             id TEXT PRIMARY KEY,
+            owner_id TEXT DEFAULT 'public',
             filename TEXT NOT NULL,
             file_type TEXT NOT NULL,
             file_size_bytes INTEGER NOT NULL,
             chunk_count INTEGER DEFAULT 0,
             status TEXT DEFAULT 'processing',
             created_at TEXT NOT NULL,
-            error_message TEXT
+            error_message TEXT,
+            storage_path TEXT
         );
 
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
+            owner_id TEXT DEFAULT 'public',
             title TEXT,
             created_at TEXT NOT NULL
         );
@@ -57,38 +67,111 @@ async def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_messages_conv
             ON messages(conversation_id, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_documents_owner
+            ON documents(owner_id, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_conversations_owner
+            ON conversations(owner_id, created_at);
     """)
+    await _ensure_column(db, "documents", "owner_id", "TEXT DEFAULT 'public'")
+    await _ensure_column(db, "documents", "storage_path", "TEXT")
+    await _ensure_column(db, "conversations", "owner_id", "TEXT DEFAULT 'public'")
     await db.commit()
+
+
+async def _ensure_column(
+    db: aiosqlite.Connection,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
+    async with db.execute(f"PRAGMA table_info({table})") as cursor:
+        rows = await cursor.fetchall()
+    existing = {row["name"] for row in rows}
+    if column not in existing:
+        await db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+# --- User operations ---
+
+async def create_user(
+    user_id: str,
+    email: str,
+    password_hash: str,
+    created_at: str,
+) -> dict:
+    db = await _get_db()
+    await db.execute(
+        "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
+        (user_id, email, password_hash, created_at),
+    )
+    await db.commit()
+    return {
+        "id": user_id,
+        "email": email,
+        "password_hash": password_hash,
+        "created_at": created_at,
+    }
+
+
+async def get_user_by_email(email: str) -> Optional[dict]:
+    db = await _get_db()
+    async with db.execute("SELECT * FROM users WHERE email = ?", (email,)) as cursor:
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_user_by_id(user_id: str) -> Optional[dict]:
+    if user_id == "public":
+        return {
+            "id": "public",
+            "email": "public@local",
+            "password_hash": "",
+            "created_at": "",
+        }
+    db = await _get_db()
+    async with db.execute("SELECT * FROM users WHERE id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
 
 # --- Document operations ---
 
-async def insert_document(doc: DocumentOut) -> DocumentOut:
+async def insert_document(
+    doc: DocumentOut,
+    owner_id: str = "public",
+    storage_path: Optional[str] = None,
+) -> DocumentOut:
     db = await _get_db()
     await db.execute(
-        """INSERT INTO documents (id, filename, file_type, file_size_bytes,
-           chunk_count, status, created_at, error_message)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (doc.id, doc.filename, doc.file_type, doc.file_size_bytes,
-         doc.chunk_count, doc.status, doc.created_at, doc.error_message),
+        """INSERT INTO documents (id, owner_id, filename, file_type, file_size_bytes,
+           chunk_count, status, created_at, error_message, storage_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (doc.id, owner_id, doc.filename, doc.file_type, doc.file_size_bytes,
+         doc.chunk_count, doc.status, doc.created_at, doc.error_message, storage_path),
     )
     await db.commit()
     return doc
 
 
-async def get_document(doc_id: str) -> Optional[DocumentOut]:
+async def get_document(doc_id: str, owner_id: str = "public") -> Optional[DocumentOut]:
     db = await _get_db()
-    async with db.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)) as cursor:
+    async with db.execute(
+        "SELECT * FROM documents WHERE id = ? AND owner_id = ?",
+        (doc_id, owner_id),
+    ) as cursor:
         row = await cursor.fetchone()
         if row:
             return DocumentOut(**dict(row))
     return None
 
 
-async def list_documents() -> List[DocumentOut]:
+async def list_documents(owner_id: str = "public") -> List[DocumentOut]:
     db = await _get_db()
     async with db.execute(
-        "SELECT * FROM documents ORDER BY created_at DESC"
+        "SELECT * FROM documents WHERE owner_id = ? ORDER BY created_at DESC",
+        (owner_id,),
     ) as cursor:
         rows = await cursor.fetchall()
         return [DocumentOut(**dict(r)) for r in rows]
@@ -112,34 +195,64 @@ async def update_document_chunk_count(doc_id: str, chunk_count: int):
     await db.commit()
 
 
-async def delete_document(doc_id: str) -> bool:
+async def rename_document(doc_id: str, owner_id: str, filename: str) -> Optional[DocumentOut]:
     db = await _get_db()
-    cursor = await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    cursor = await db.execute(
+        "UPDATE documents SET filename = ? WHERE id = ? AND owner_id = ?",
+        (filename, doc_id, owner_id),
+    )
+    await db.commit()
+    if cursor.rowcount == 0:
+        return None
+    return await get_document(doc_id, owner_id)
+
+
+async def get_document_storage_path(doc_id: str, owner_id: str) -> Optional[str]:
+    db = await _get_db()
+    async with db.execute(
+        "SELECT storage_path FROM documents WHERE id = ? AND owner_id = ?",
+        (doc_id, owner_id),
+    ) as cursor:
+        row = await cursor.fetchone()
+        return row["storage_path"] if row else None
+
+
+async def delete_document(doc_id: str, owner_id: str = "public") -> bool:
+    db = await _get_db()
+    cursor = await db.execute(
+        "DELETE FROM documents WHERE id = ? AND owner_id = ?",
+        (doc_id, owner_id),
+    )
     await db.commit()
     return cursor.rowcount > 0
 
 
 # --- Conversation operations ---
 
-async def create_conversation(conv_id: str, created_at: str) -> dict:
+async def create_conversation(
+    conv_id: str,
+    created_at: str,
+    owner_id: str = "public",
+) -> dict:
     db = await _get_db()
     await db.execute(
-        "INSERT INTO conversations (id, title, created_at) VALUES (?, NULL, ?)",
-        (conv_id, created_at),
+        "INSERT INTO conversations (id, owner_id, title, created_at) VALUES (?, ?, NULL, ?)",
+        (conv_id, owner_id, created_at),
     )
     await db.commit()
     return {"conversation_id": conv_id, "title": None, "created_at": created_at}
 
 
-async def list_conversations() -> List[ConversationListItem]:
+async def list_conversations(owner_id: str = "public") -> List[ConversationListItem]:
     db = await _get_db()
     async with db.execute("""
         SELECT c.id, c.title, c.created_at, COUNT(m.id) as message_count
         FROM conversations c
         LEFT JOIN messages m ON c.id = m.conversation_id
+        WHERE c.owner_id = ?
         GROUP BY c.id
         ORDER BY c.created_at DESC
-    """) as cursor:
+    """, (owner_id,)) as cursor:
         rows = await cursor.fetchall()
         return [
             ConversationListItem(
@@ -152,10 +265,14 @@ async def list_conversations() -> List[ConversationListItem]:
         ]
 
 
-async def get_conversation(conv_id: str) -> Optional[ConversationOut]:
+async def get_conversation(
+    conv_id: str,
+    owner_id: str = "public",
+) -> Optional[ConversationOut]:
     db = await _get_db()
     async with db.execute(
-        "SELECT * FROM conversations WHERE id = ?", (conv_id,)
+        "SELECT * FROM conversations WHERE id = ? AND owner_id = ?",
+        (conv_id, owner_id),
     ) as cursor:
         row = await cursor.fetchone()
         if not row:
@@ -229,9 +346,18 @@ async def add_message(
     await db.commit()
 
 
-async def delete_conversation(conv_id: str) -> bool:
+async def delete_conversation(conv_id: str, owner_id: str = "public") -> bool:
     db = await _get_db()
+    async with db.execute(
+        "SELECT id FROM conversations WHERE id = ? AND owner_id = ?",
+        (conv_id, owner_id),
+    ) as check_cursor:
+        if not await check_cursor.fetchone():
+            return False
     await db.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
-    cursor = await db.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+    cursor = await db.execute(
+        "DELETE FROM conversations WHERE id = ? AND owner_id = ?",
+        (conv_id, owner_id),
+    )
     await db.commit()
     return cursor.rowcount > 0

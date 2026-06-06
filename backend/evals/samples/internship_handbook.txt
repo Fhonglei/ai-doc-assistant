@@ -1,0 +1,5 @@
+Internship application handbook
+
+Strong internship applications include a deployed demo, a clear README, tests, and a short explanation of the technical tradeoffs. Recruiters should be able to open the demo link and understand the project in under two minutes.
+
+For AI projects, explain retrieval quality, citation correctness, and what happens when the answer is not in the documents.

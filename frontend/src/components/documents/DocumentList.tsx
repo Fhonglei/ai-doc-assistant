@@ -1,11 +1,14 @@
 import type { Document } from "@/lib/types";
-import { IconTrash } from "@/components/common/Icons";
+import { IconEdit, IconList, IconRefresh, IconTrash } from "@/components/common/Icons";
 
 interface DocumentListProps {
   documents: Document[];
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename?: (id: string, currentName: string) => void;
+  onReindex?: (id: string) => void;
+  onShowChunks?: (id: string) => void;
 }
 
 export function DocumentList({
@@ -13,6 +16,9 @@ export function DocumentList({
   selectedIds,
   onToggleSelect,
   onDelete,
+  onRename,
+  onReindex,
+  onShowChunks,
 }: DocumentListProps) {
   if (documents.length === 0) return null;
 
@@ -25,6 +31,9 @@ export function DocumentList({
           selected={selectedIds.includes(doc.id)}
           onToggleSelect={onToggleSelect}
           onDelete={onDelete}
+          onRename={onRename}
+          onReindex={onReindex}
+          onShowChunks={onShowChunks}
         />
       ))}
     </ul>
@@ -36,11 +45,17 @@ function DocumentCard({
   selected,
   onToggleSelect,
   onDelete,
+  onRename,
+  onReindex,
+  onShowChunks,
 }: {
   document: Document;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename?: (id: string, currentName: string) => void;
+  onReindex?: (id: string) => void;
+  onShowChunks?: (id: string) => void;
 }) {
   const ready = doc.status === "ready";
   const ext = doc.file_type?.toUpperCase() || "FILE";
@@ -72,17 +87,58 @@ function DocumentCard({
           {doc.status === "error" && " · 失败"}
         </p>
       </div>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(doc.id);
-        }}
-        className="shrink-0 rounded-md p-1.5 text-muted opacity-0 transition hover:bg-surface-inset hover:text-[var(--danger)] group-hover:opacity-100"
-        title="删除文档"
-      >
-        <IconTrash />
-      </button>
+      <div className="flex shrink-0 items-center opacity-0 transition group-hover:opacity-100">
+        {ready && onShowChunks && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowChunks(doc.id);
+            }}
+            className="rounded-md p-1.5 text-muted hover:bg-surface-inset hover:text-accent"
+            title="查看 chunks"
+          >
+            <IconList />
+          </button>
+        )}
+        {onRename && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRename(doc.id, doc.filename);
+            }}
+            className="rounded-md p-1.5 text-muted hover:bg-surface-inset hover:text-accent"
+            title="重命名"
+          >
+            <IconEdit />
+          </button>
+        )}
+        {onReindex && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReindex(doc.id);
+            }}
+            className="rounded-md p-1.5 text-muted hover:bg-surface-inset hover:text-accent"
+            title="重新索引"
+          >
+            <IconRefresh />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(doc.id);
+          }}
+          className="rounded-md p-1.5 text-muted hover:bg-surface-inset hover:text-[var(--danger)]"
+          title="删除文档"
+        >
+          <IconTrash />
+        </button>
+      </div>
     </li>
   );
 }

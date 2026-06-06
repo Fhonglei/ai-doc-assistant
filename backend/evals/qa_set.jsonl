@@ -1,0 +1,4 @@
+{"id":"internship-demo","question":"What should a strong internship project application include?","expected_document":"internship_handbook.txt","expected_terms":["deployed demo","README","tests"],"answerable":true}
+{"id":"ai-quality","question":"For AI projects, what quality checks should be explained?","expected_document":"internship_handbook.txt","expected_terms":["retrieval quality","citation correctness"],"answerable":true}
+{"id":"frontend-deploy","question":"Where should the frontend be deployed and what environment variable is needed?","expected_document":"deployment_notes.txt","expected_terms":["Vercel","NEXT_PUBLIC_API_URL"],"answerable":true}
+{"id":"unknown-payroll","question":"What is the payroll policy for summer interns?","expected_document":null,"expected_terms":[],"answerable":false}

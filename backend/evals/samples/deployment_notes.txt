@@ -1,0 +1,5 @@
+Deployment notes
+
+The frontend is designed for Vercel. Set NEXT_PUBLIC_API_URL to the public backend URL.
+
+The backend can run on Render or Railway. It needs DEEPSEEK_API_KEY or OPENAI_API_KEY, CORS_ORIGINS, CHROMA_PERSIST_DIR, and METADATA_DB_PATH. A health check is available at /api/health.

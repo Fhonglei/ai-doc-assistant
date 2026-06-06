@@ -22,4 +22,5 @@ async def health_check():
         "service": "ai-doc-assistant",
         "llm_configured": llm_ok,
         "model": settings.llm_model,
+        "auth_enabled": settings.auth_enabled,
     }

@@ -16,6 +16,19 @@ export interface DocumentList {
   total: number;
 }
 
+export interface DocumentChunk {
+  id: string;
+  text: string;
+  chunk_index: number;
+  page_number: number | null;
+}
+
+export interface DocumentChunks {
+  document_id: string;
+  chunks: DocumentChunk[];
+  total: number;
+}
+
 export interface DeleteResponse {
   success: boolean;
   message: string;
@@ -68,6 +81,26 @@ export interface ChatResponse {
   answer: string;
   sources: Source[];
   conversation_id: string;
+}
+
+export interface HealthResponse {
+  status: string;
+  service: string;
+  llm_configured: boolean;
+  model: string;
+  auth_enabled: boolean;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: User;
 }
 
 export type SSEEvent =

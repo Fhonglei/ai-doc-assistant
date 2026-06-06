@@ -2,13 +2,17 @@
 
 import { API_BASE_URL } from "./constants";
 import type {
+  AuthResponse,
   Document,
+  DocumentChunks,
   DocumentList,
   DeleteResponse,
   ChatRequest,
   ChatResponse,
   Conversation,
   ConversationList,
+  HealthResponse,
+  User,
 } from "./types";
 import type { SSEEvent } from "./types";
 
@@ -17,6 +21,29 @@ type ApiErrorBody = {
   error?: { message?: string; code?: string };
   message?: string;
 };
+
+const AUTH_TOKEN_KEY = "ai-doc-assistant-token";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+}
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const headers = new Headers(extra);
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   const text = await res.text().catch(() => "");
@@ -70,7 +97,7 @@ function consumeSSEFrames(
 
 // --- Health ---
 
-export async function checkHealth(): Promise<{ status: string }> {
+export async function checkHealth(): Promise<HealthResponse> {
   const res = await fetch(`${API_BASE_URL}/api/health`, {
     method: "GET",
     cache: "no-store",
@@ -87,6 +114,7 @@ export async function uploadDocument(file: File): Promise<Document> {
 
   const res = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
     method: "POST",
+    headers: authHeaders(),
     body: formData,
   });
 
@@ -96,22 +124,64 @@ export async function uploadDocument(file: File): Promise<Document> {
 }
 
 export async function listDocuments(): Promise<DocumentList> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/documents`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents`, {
+    headers: authHeaders(),
+  });
   await ensureOk(res, "Failed to fetch documents");
   return res.json();
 }
 
 export async function getDocument(id: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`, {
+    headers: authHeaders(),
+  });
   await ensureOk(res, "Document not found");
+  return res.json();
+}
+
+export async function renameDocument(id: string, filename: string): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ filename }),
+  });
+  await ensureOk(res, "Failed to rename document");
+  return res.json();
+}
+
+export async function reindexDocument(id: string): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}/reindex`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  await ensureOk(res, "Failed to reindex document");
+  return res.json();
+}
+
+export async function getDocumentChunks(id: string): Promise<DocumentChunks> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}/chunks`, {
+    headers: authHeaders(),
+  });
+  await ensureOk(res, "Failed to fetch document chunks");
   return res.json();
 }
 
 export async function deleteDocument(id: string): Promise<DeleteResponse> {
   const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`, {
     method: "DELETE",
+    headers: authHeaders(),
   });
   await ensureOk(res, "Failed to delete document");
+  return res.json();
+}
+
+export async function bulkDeleteDocuments(ids: string[]): Promise<DeleteResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/documents/bulk-delete`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ document_ids: ids }),
+  });
+  await ensureOk(res, "Failed to delete documents");
   return res.json();
 }
 
@@ -124,7 +194,7 @@ export async function sendChatMessage(
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/v1/chat/send`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ ...request, stream: true }),
     signal,
   });
@@ -160,7 +230,7 @@ export async function sendChatMessageNonStreaming(
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE_URL}/api/v1/chat/send`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ ...request, stream: false }),
   });
 
@@ -174,19 +244,24 @@ export async function sendChatMessageNonStreaming(
 export async function createConversation(): Promise<{ conversation_id: string }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
     method: "POST",
+    headers: authHeaders(),
   });
   await ensureOk(res, "Failed to create conversation");
   return res.json();
 }
 
 export async function listConversations(): Promise<ConversationList> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/conversations`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
+    headers: authHeaders(),
+  });
   await ensureOk(res, "Failed to fetch conversations");
   return res.json();
 }
 
 export async function getConversation(id: string): Promise<Conversation> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/conversations/${id}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/conversations/${id}`, {
+    headers: authHeaders(),
+  });
   await ensureOk(res, "Conversation not found");
   return res.json();
 }
@@ -194,6 +269,37 @@ export async function getConversation(id: string): Promise<Conversation> {
 export async function deleteConversation(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations/${id}`, {
     method: "DELETE",
+    headers: authHeaders(),
   });
   await ensureOk(res, "Failed to delete conversation");
+}
+
+// --- Auth ---
+
+export async function register(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  await ensureOk(res, "Failed to register");
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  await ensureOk(res, "Failed to log in");
+  return res.json();
+}
+
+export async function getCurrentUser(): Promise<User> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+    headers: authHeaders(),
+  });
+  await ensureOk(res, "Failed to load user");
+  return res.json();
 }

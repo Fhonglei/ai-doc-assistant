@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: ai-doc-assistant-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: deepseek-chat
+      - key: LLM_FALLBACK_MODEL
+        value: gpt-4o-mini
+      - key: HF_ENDPOINT
+        value: https://hf-mirror.com
+      - key: CHROMA_PERSIST_DIR
+        value: /opt/render/project/src/backend/data/chroma
+      - key: METADATA_DB_PATH
+        value: /opt/render/project/src/backend/data/metadata.db
+      - key: UPLOAD_DIR
+        value: /opt/render/project/src/backend/data/uploads
+      - key: CORS_ORIGINS
+        sync: false
+      - key: AUTH_ENABLED
+        value: "true"
+      - key: AUTH_SECRET_KEY
+        sync: false
+      - key: AUTH_TOKEN_TTL_MINUTES
+        value: "10080"

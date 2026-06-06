@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # --- Storage ---
     chroma_persist_dir: str = "./data/chroma"
     metadata_db_path: str = "./data/metadata.db"
+    upload_dir: str = "./data/uploads"
 
     # --- Limits ---
     max_file_size_mb: int = 50
@@ -37,6 +38,11 @@ class Settings(BaseSettings):
 
     # --- CORS ---
     cors_origins: str = "http://localhost:3000,https://ai-doc-assistant.vercel.app"
+
+    # --- Auth ---
+    auth_enabled: bool = False
+    auth_secret_key: str = "change-me-before-deploying"
+    auth_token_ttl_minutes: int = 60 * 24 * 7
 
     # --- Server ---
     port: int = 8000

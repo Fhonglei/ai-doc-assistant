@@ -1,138 +1,236 @@
-# 📄 AI Document Assistant
+# AI Document Assistant
 
-**RAG-powered document Q&A system** — Upload PDF, DOCX, or TXT files, then ask questions in natural language. Get AI-generated answers with inline citations to your source documents.
+A full-stack RAG document Q&A app for uploading PDF, DOCX, and TXT files, asking natural-language questions, and receiving streaming answers with source citations.
 
-![Tech Stack](https://img.shields.io/badge/Next.js-14-black?logo=next.js) ![Tech Stack](https://img.shields.io/badge/FastAPI-0.110-teal?logo=fastapi) ![Tech Stack](https://img.shields.io/badge/ChromaDB-vector--db-orange) ![Tech Stack](https://img.shields.io/badge/DeepSeek-LLM-blue)
+This project is designed as a portfolio-grade AI application: it includes document ingestion, vector search, citation-aware generation, conversation history, optional login, user-level data isolation, Docker Compose, deployment configuration, backend tests, and a small RAG evaluation harness.
 
-## ✨ Features
+## Demo
 
-- **📤 Multi-format Upload** — PDF, DOCX, TXT with drag-and-drop support
-- **🔍 Smart Retrieval** — Two-stage search: ChromaDB embedding similarity + LLM reranking
-- **💬 Streaming Chat** — Real-time SSE streaming responses with markdown rendering
-- **📎 Source Citations** — Inline `[1]` `[2]` citation badges that expand to show source text
-- **📚 Multi-Document Queries** — Ask questions across multiple documents simultaneously
-- **💾 Conversation History** — All chats saved with automatic title generation
-- **🌙 Dark Mode** — Toggle light/dark theme (persisted)
-- **📱 Responsive** — Three-panel layout with mobile drawers
-- **🎯 Scoped Search** — Select specific documents or search all
+Add your deployed links here after release:
 
-## 🏗️ Architecture
+- Frontend: `https://your-vercel-app.vercel.app`
+- Backend health check: `https://your-render-service.onrender.com/api/health`
+- Demo video/GIF: `docs/demo.gif`
+- Screenshot: `docs/app-screenshot.png`
 
+## Highlights
+
+- Multi-format upload for PDF, DOCX, and TXT.
+- Asynchronous ingestion: upload returns immediately, then parsing, chunking, embedding, and indexing run in the background.
+- RAG retrieval with ChromaDB and local sentence-transformer embeddings.
+- Optional LLM reranking and citation-aware answer generation.
+- Streaming chat over SSE with inline `[1]` citations and source chunk viewer.
+- Conversation history with scoped document search.
+- Optional email/password login and per-user document/conversation isolation.
+- Document management: search, rename, delete, bulk delete, reindex, and inspect chunks.
+- Docker Compose for one-command local startup.
+- Render Blueprint and Vercel configuration for online deployment.
+- Backend tests and a small RAG evaluation dataset.
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 14, React, Tailwind CSS, Zustand |
+| Backend | FastAPI, Pydantic, SQLite, ChromaDB |
+| AI | DeepSeek/OpenAI-compatible chat API, sentence-transformers |
+| Retrieval | Chunking, embeddings, vector search, LLM reranking |
+| Deployment | Vercel frontend, Render/Railway backend, Docker Compose |
+| Testing | pytest, FastAPI TestClient, mock LLM tests |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  U["User"] --> F["Next.js frontend"]
+  F --> A["FastAPI API"]
+  A --> P["Parser + chunker"]
+  P --> E["Embedding model"]
+  E --> V["ChromaDB vector store"]
+  A --> S["SQLite metadata store"]
+  A --> L["DeepSeek/OpenAI LLM"]
+  L --> A
+  A --> F
 ```
-┌─────────────┐     ┌──────────────┐     ┌────────────┐
-│  Next.js 14 │────▶│   FastAPI    │────▶│  DeepSeek  │
-│  (Vercel)   │◀────│  (Railway)   │◀────│    API     │
-└─────────────┘     └──────┬───────┘     └────────────┘
-                           │
-                    ┌──────┴───────┐
-                    │   ChromaDB   │
-                    │  (embedded)  │
-                    └──────────────┘
+
+## Quick Start
+
+### Option 1: Docker Compose
+
+Create a `.env` file in the repository root:
+
+```bash
+DEEPSEEK_API_KEY=sk-your-key
+CORS_ORIGINS=http://localhost:3000
+AUTH_ENABLED=false
+AUTH_SECRET_KEY=local-dev-secret-change-me
 ```
 
-## 🚀 Quick Start
+Run the stack:
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- DeepSeek API key (or OpenAI API key)
+```bash
+docker compose up --build
+```
 
-### Backend Setup
+Open:
+
+- Frontend: `http://localhost:3000`
+- Backend health: `http://localhost:8000/api/health`
+
+### Option 2: Manual Local Setup
+
+Backend:
 
 ```bash
 cd backend
+cp .env.example .env
 pip install -r requirements.txt
-cp .env.example .env   # or place .env in repo root
-# Edit .env with your DEEPSEEK_API_KEY
 python main.py
 ```
 
-### Frontend Setup
+Frontend:
 
 ```bash
 cd frontend
-npm install
 cp .env.local.example .env.local
-# Edit .env.local with your backend URL
+npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000` 🎉
+## Environment Variables
 
-## 📡 API Endpoints
+### Backend
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/v1/documents/upload` | Upload a document |
-| `GET` | `/api/v1/documents` | List all documents |
-| `GET` | `/api/v1/documents/{id}` | Get document details |
-| `DELETE` | `/api/v1/documents/{id}` | Delete document + chunks |
-| `POST` | `/api/v1/chat/send` | Send query (streaming SSE) |
-| `POST` | `/api/v1/conversations` | Create conversation |
-| `GET` | `/api/v1/conversations` | List conversations |
-| `GET` | `/api/v1/conversations/{id}` | Get conversation + messages |
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DEEPSEEK_API_KEY` | Yes, unless using OpenAI | DeepSeek API key |
+| `OPENAI_API_KEY` | Optional | Fallback OpenAI-compatible key |
+| `DEEPSEEK_BASE_URL` | No | Default: `https://api.deepseek.com/v1` |
+| `LLM_MODEL` | No | Default: `deepseek-chat` |
+| `CHROMA_PERSIST_DIR` | No | Chroma persistent data path |
+| `METADATA_DB_PATH` | No | SQLite metadata path |
+| `UPLOAD_DIR` | No | Original uploaded files for reindexing |
+| `CORS_ORIGINS` | Yes in deployment | Comma-separated allowed frontend URLs |
+| `AUTH_ENABLED` | No | Set `true` to require login |
+| `AUTH_SECRET_KEY` | Yes if auth enabled | Long random token signing secret |
 
-## 🗂️ Project Structure
+### Frontend
 
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | Yes | Public backend URL |
+
+## Testing
+
+Backend tests:
+
+```bash
+cd backend
+pytest
 ```
+
+Covered areas:
+
+- File type validation.
+- TXT parsing.
+- Chunk generation.
+- Chat API behavior with mocked retrieval and mocked LLM generation.
+
+Frontend checks:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+## RAG Evaluation
+
+Run a fast offline retrieval check:
+
+```bash
+cd backend
+python scripts/evaluate_rag.py
+```
+
+Run a live backend evaluation:
+
+```bash
+python scripts/evaluate_rag.py --backend-url http://localhost:8000
+```
+
+If auth is enabled:
+
+```bash
+python scripts/evaluate_rag.py --backend-url https://your-api.onrender.com --token YOUR_ACCESS_TOKEN
+```
+
+The evaluation writes a JSON report to `backend/evals/last_run.json`.
+
+## Deployment
+
+### Backend on Render
+
+This repository includes `render.yaml`.
+
+1. Push the repository to GitHub.
+2. Open Render Blueprint:
+   `https://dashboard.render.com/blueprint/new?repo=https://github.com/Fhonglei/ai-doc-assistant`
+3. Fill secret environment variables:
+   - `DEEPSEEK_API_KEY`
+   - `OPENAI_API_KEY` if needed
+   - `CORS_ORIGINS`
+   - `AUTH_SECRET_KEY`
+4. Apply the Blueprint and wait for `/api/health` to return 200.
+
+### Frontend on Vercel
+
+Deploy the `frontend/` directory.
+
+Required Vercel environment variable:
+
+```bash
+NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
+```
+
+After the backend URL is known, redeploy the frontend so the public API URL is baked into the Next.js build.
+
+## Security Notes
+
+- API keys only live in backend environment variables.
+- CORS is explicit through `CORS_ORIGINS`.
+- `AUTH_ENABLED=true` requires users to register/login.
+- Documents, conversations, and vector search are scoped by user ID.
+- Uploaded files are size and type checked before ingestion.
+- Security headers are added by FastAPI middleware.
+- Use a long random `AUTH_SECRET_KEY` in production.
+
+## Resume Description
+
+AI Document Assistant | Next.js, FastAPI, ChromaDB, DeepSeek/OpenAI, RAG
+
+Built a full-stack RAG document Q&A system supporting PDF/DOCX/TXT upload, asynchronous ingestion, semantic retrieval, streaming AI responses, citation-backed answers, conversation history, optional authentication, per-user data isolation, Docker Compose, deployment configuration, automated backend tests, and a small RAG evaluation harness.
+
+## Project Structure
+
+```text
 ai-doc-assistant/
-├── backend/                # FastAPI + ChromaDB
-│   ├── main.py            # App entry point
-│   ├── config.py          # Environment config
-│   └── app/
-│       ├── api/           # REST endpoints
-│       ├── core/          # Parser, chunker, embedder, retriever, generator
-│       ├── db/            # ChromaDB + SQLite stores
-│       ├── models/        # Pydantic schemas
-│       └── utils/         # File validation, error handlers
-├── frontend/              # Next.js 14 + Tailwind
-│   └── src/
-│       ├── app/           # App Router pages
-│       ├── components/    # React components
-│       ├── hooks/         # Custom React hooks
-│       ├── lib/           # API client, types, utils
-│       └── stores/        # Zustand state stores
-└── README.md
+  backend/
+    app/
+      api/          FastAPI routes
+      core/         parsing, chunking, retrieval, generation, auth
+      db/           SQLite metadata store and ChromaDB vector store
+      models/       Pydantic schemas
+    evals/          sample RAG evaluation dataset
+    scripts/        evaluation runner
+    tests/          pytest test suite
+  frontend/
+    src/
+      app/          Next.js App Router
+      components/   UI components
+      hooks/        React hooks
+      lib/          typed API client and types
+      stores/       Zustand state stores
+  docker-compose.yml
+  render.yaml
 ```
-
-## 🔧 Environment Variables
-
-### Backend (.env)
-
-```bash
-DEEPSEEK_API_KEY=sk-...      # Required
-OPENAI_API_KEY=sk-...        # Optional fallback
-CHROMA_PERSIST_DIR=./data    # Vector DB storage
-MAX_FILE_SIZE_MB=50          # Upload size limit
-CORS_ORIGINS=http://localhost:3000
-```
-
-### Frontend (.env.local)
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-## 🚢 Deployment
-
-### Backend → Railway
-1. Push to GitHub
-2. Connect Railway to repo → select `backend/` directory
-3. Add environment variables in Railway dashboard
-4. Attach a volume at `/app/data` for persistence
-5. Deploy!
-
-### Frontend → Vercel
-1. Push to GitHub
-2. Connect Vercel to repo → select `frontend/` directory
-3. Set `NEXT_PUBLIC_API_URL` to your Railway URL
-4. Deploy!
-
-## 📄 License
-
-MIT
-
----
-
-Built with ❤️ using [Claude Code](https://claude.ai/code), [DeepSeek](https://deepseek.com), and [Next.js](https://nextjs.org)

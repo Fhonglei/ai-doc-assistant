@@ -4,9 +4,10 @@ import uuid
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.core.auth import UserContext, get_current_user
 from app.models.chat import (
     ChatRequest,
     ChatResponse,
@@ -27,7 +28,10 @@ MAX_QUERY_LENGTH = 4000
 
 
 @router.post("/send")
-async def send_message(request: ChatRequest):
+async def send_message(
+    request: ChatRequest,
+    user: UserContext = Depends(get_current_user),
+):
     """Send a query and get an AI response with citations."""
     # Validate
     if not request.query.strip():
@@ -44,10 +48,12 @@ async def send_message(request: ChatRequest):
     conv_id = request.conversation_id or str(uuid.uuid4())
     if not request.conversation_id:
         now = datetime.now(timezone.utc).isoformat()
-        await create_conversation(conv_id, now)
+        await create_conversation(conv_id, now, user.user_id)
 
     # Load conversation history
-    conversation = await get_conversation(conv_id)
+    conversation = await get_conversation(conv_id, user.user_id)
+    if request.conversation_id and not conversation:
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {conv_id}")
     history = conversation.messages if conversation else []
 
     # Save user message
@@ -61,6 +67,7 @@ async def send_message(request: ChatRequest):
     candidates = await retrieve_candidates(
         request.query.strip(),
         document_ids=document_ids,
+        owner_id=user.user_id,
         top_k=settings.retrieval_top_k,
     )
 

@@ -3,8 +3,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.auth import UserContext, get_current_user
 from app.models.chat import (
     ConversationOut,
     ConversationListOut,
@@ -22,34 +23,40 @@ router = APIRouter(prefix="/api/v1/conversations", tags=["conversations"])
 
 
 @router.post("", response_model=ConversationCreateOut, status_code=201)
-async def create_new_conversation():
+async def create_new_conversation(user: UserContext = Depends(get_current_user)):
     """Create a new empty conversation."""
     conv_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
-    result = await create_conversation(conv_id, now)
+    result = await create_conversation(conv_id, now, user.user_id)
     return ConversationCreateOut(**result)
 
 
 @router.get("", response_model=ConversationListOut)
-async def list_all_conversations():
+async def list_all_conversations(user: UserContext = Depends(get_current_user)):
     """List all conversations."""
-    convs = await list_conversations()
+    convs = await list_conversations(user.user_id)
     return ConversationListOut(conversations=convs, total=len(convs))
 
 
 @router.get("/{conv_id}", response_model=ConversationOut)
-async def get_conversation_by_id(conv_id: str):
+async def get_conversation_by_id(
+    conv_id: str,
+    user: UserContext = Depends(get_current_user),
+):
     """Get a conversation with all its messages."""
-    conv = await get_conversation(conv_id)
+    conv = await get_conversation(conv_id, user.user_id)
     if not conv:
         raise HTTPException(status_code=404, detail=f"Conversation not found: {conv_id}")
     return conv
 
 
 @router.delete("/{conv_id}")
-async def delete_conversation_by_id(conv_id: str):
+async def delete_conversation_by_id(
+    conv_id: str,
+    user: UserContext = Depends(get_current_user),
+):
     """Delete a conversation and its messages."""
-    deleted = await delete_conversation(conv_id)
+    deleted = await delete_conversation(conv_id, user.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Conversation not found: {conv_id}")
     return {"success": True, "message": f"Conversation deleted."}

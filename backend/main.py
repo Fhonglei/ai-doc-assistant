@@ -32,6 +32,9 @@ from app.utils.exception_handlers import value_error_handler, generic_exception_
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: init DB and preload embedding model."""
+    if settings.auth_enabled and settings.auth_secret_key == "change-me-before-deploying":
+        logger.warning("AUTH_ENABLED is true but AUTH_SECRET_KEY is still the default value.")
+
     logger.info("Initializing database...")
     await init_db()
 
@@ -71,6 +74,15 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 # Mount all API routes
 app.include_router(api_router)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 if __name__ == "__main__":

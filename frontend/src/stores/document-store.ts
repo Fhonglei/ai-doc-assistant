@@ -19,6 +19,7 @@ interface DocumentState {
 
   // Actions
   setDocuments: (docs: Document[]) => void;
+  upsertDocument: (doc: Document) => void;
   toggleDocumentSelection: (id: string) => void;
   selectAllDocuments: () => void;
   clearDocumentSelection: () => void;
@@ -56,6 +57,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         docs.some((d) => d.id === id)
       ),
     }),
+
+  upsertDocument: (doc) =>
+    set((state) => ({
+      documents: [doc, ...state.documents.filter((d) => d.id !== doc.id)],
+    })),
 
   toggleDocumentSelection: (id) =>
     set((state) => {

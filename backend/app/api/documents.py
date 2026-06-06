@@ -1,28 +1,56 @@
 """Document upload and management endpoints."""
 
+import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, File, HTTPException
 
-from app.models.document import DocumentOut, DocumentListOut, DeleteResponse
+from app.core.auth import UserContext, get_current_user
+from app.models.document import (
+    BulkDeleteRequest,
+    DeleteResponse,
+    DocumentChunksOut,
+    DocumentListOut,
+    DocumentOut,
+    DocumentRenameRequest,
+)
 from app.utils.file_utils import validate_file
-from app.core.parser import parse_document
-from app.core.chunker import chunk_document
-from app.core.embedder import embed_chunks
-from app.db.vector_store import add_chunks, delete_document_chunks
+from app.core.ingestion import process_document_file
+from app.db.vector_store import (
+    delete_document_chunks,
+    get_document_chunks,
+    rename_document_chunks,
+)
 from app.db.metadata_store import (
     insert_document, get_document, list_documents,
-    delete_document, update_document_status, update_document_chunk_count,
+    delete_document, get_document_storage_path, rename_document,
 )
+from config import settings
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
 
+def _safe_filename(filename: str) -> str:
+    return Path(filename or "unknown").name.strip() or "unknown"
+
+
+def _storage_path(doc_id: str, filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return str(upload_dir / f"{doc_id}{ext}")
+
+
 @router.post("/upload", response_model=DocumentOut, status_code=201)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user: UserContext = Depends(get_current_user),
+):
     content = await file.read()
-    filename = file.filename or "unknown"
+    filename = _safe_filename(file.filename or "unknown")
 
     try:
         file_type = validate_file(content, filename)
@@ -40,63 +68,128 @@ async def upload_document(file: UploadFile = File(...)):
         file_size_bytes=len(content), chunk_count=0,
         status="processing", created_at=now,
     )
-    await insert_document(doc)
+    storage_path = _storage_path(doc_id, filename)
+    with open(storage_path, "wb") as fh:
+        fh.write(content)
 
-    try:
-        parsed = parse_document(content, filename, file_type)
-        chunks = chunk_document(parsed)
-
-        # Generate embeddings (batched, using cached sentence-transformers model)
-        chunk_texts = [c.text for c in chunks]
-        batch_size = 25
-        all_embeddings = []
-        for i in range(0, len(chunk_texts), batch_size):
-            batch = chunk_texts[i:i + batch_size]
-            batch_embs = await embed_chunks(batch)
-            all_embeddings.extend(batch_embs)
-
-        chunk_metadatas = [
-            {"chunk_index": c.chunk_index, "page_number": c.page_number, "text": c.text[:500]}
-            for c in chunks
-        ]
-
-        add_chunks(doc_id, chunk_texts, chunk_metadatas, all_embeddings, filename)
-
-        await update_document_status(doc_id, "ready")
-        await update_document_chunk_count(doc_id, len(chunks))
-        doc.status = "ready"
-        doc.chunk_count = len(chunks)
-
-    except Exception as e:
-        await update_document_status(doc_id, "error", str(e)[:500])
-        doc.status = "error"
-        doc.error_message = str(e)[:500]
+    await insert_document(doc, owner_id=user.user_id, storage_path=storage_path)
+    background_tasks.add_task(
+        process_document_file,
+        doc_id=doc_id,
+        owner_id=user.user_id,
+        storage_path=storage_path,
+        filename=filename,
+        file_type=file_type,
+    )
 
     return doc
 
 
 @router.get("", response_model=DocumentListOut)
-async def list_all_documents():
-    docs = await list_documents()
+async def list_all_documents(user: UserContext = Depends(get_current_user)):
+    docs = await list_documents(user.user_id)
     return DocumentListOut(documents=docs, total=len(docs))
 
 
 @router.get("/{doc_id}", response_model=DocumentOut)
-async def get_document_by_id(doc_id: str):
-    doc = await get_document(doc_id)
+async def get_document_by_id(doc_id: str, user: UserContext = Depends(get_current_user)):
+    doc = await get_document(doc_id, user.user_id)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
     return doc
 
 
-@router.delete("/{doc_id}", response_model=DeleteResponse)
-async def delete_document_by_id(doc_id: str):
-    doc = await get_document(doc_id)
+@router.patch("/{doc_id}", response_model=DocumentOut)
+async def rename_document_by_id(
+    doc_id: str,
+    request: DocumentRenameRequest,
+    user: UserContext = Depends(get_current_user),
+):
+    filename = _safe_filename(request.filename)
+    if not filename:
+        raise HTTPException(status_code=400, detail="Filename cannot be empty.")
+
+    doc = await rename_document(doc_id, user.user_id, filename)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
-    deleted = delete_document_chunks(doc_id)
-    await delete_document(doc_id)
+    rename_document_chunks(doc_id, user.user_id, filename)
+    return doc
+
+
+@router.post("/{doc_id}/reindex", response_model=DocumentOut)
+async def reindex_document_by_id(
+    doc_id: str,
+    background_tasks: BackgroundTasks,
+    user: UserContext = Depends(get_current_user),
+):
+    doc = await get_document(doc_id, user.user_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
+
+    storage_path = await get_document_storage_path(doc_id, user.user_id)
+    if not storage_path or not os.path.exists(storage_path):
+        raise HTTPException(status_code=409, detail="Original file is not available for reindexing.")
+
+    background_tasks.add_task(
+        process_document_file,
+        doc_id=doc_id,
+        owner_id=user.user_id,
+        storage_path=storage_path,
+        filename=doc.filename,
+        file_type=doc.file_type,
+        replace_existing_chunks=True,
+    )
+    doc.status = "processing"
+    return doc
+
+
+@router.get("/{doc_id}/chunks", response_model=DocumentChunksOut)
+async def get_document_chunks_by_id(
+    doc_id: str,
+    user: UserContext = Depends(get_current_user),
+):
+    doc = await get_document(doc_id, user.user_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
+    chunks = get_document_chunks(doc_id, user.user_id)
+    return DocumentChunksOut(document_id=doc_id, chunks=chunks, total=len(chunks))
+
+
+@router.delete("/{doc_id}", response_model=DeleteResponse)
+async def delete_document_by_id(doc_id: str, user: UserContext = Depends(get_current_user)):
+    doc = await get_document(doc_id, user.user_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
+    storage_path = await get_document_storage_path(doc_id, user.user_id)
+    deleted = delete_document_chunks(doc_id, user.user_id)
+    await delete_document(doc_id, user.user_id)
+    if storage_path and os.path.exists(storage_path):
+        os.remove(storage_path)
     return DeleteResponse(
         success=True,
         message=f"Document '{doc.filename}' and its {deleted} chunks have been deleted.",
+    )
+
+
+@router.post("/bulk-delete", response_model=DeleteResponse)
+async def bulk_delete_documents(
+    request: BulkDeleteRequest,
+    user: UserContext = Depends(get_current_user),
+):
+    deleted_docs = 0
+    deleted_chunks = 0
+    for doc_id in request.document_ids:
+        doc = await get_document(doc_id, user.user_id)
+        if not doc:
+            continue
+        storage_path = await get_document_storage_path(doc_id, user.user_id)
+        deleted_chunks += delete_document_chunks(doc_id, user.user_id)
+        if await delete_document(doc_id, user.user_id):
+            deleted_docs += 1
+        if storage_path and os.path.exists(storage_path):
+            os.remove(storage_path)
+
+    return DeleteResponse(
+        success=True,
+        message=f"Deleted {deleted_docs} documents and {deleted_chunks} chunks.",
     )

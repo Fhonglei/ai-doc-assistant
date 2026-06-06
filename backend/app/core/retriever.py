@@ -24,11 +24,17 @@ class ChunkWithScore:
 async def retrieve_candidates(
     query_text: str,
     document_ids: Optional[List[str]] = None,
+    owner_id: str = "public",
     top_k: int = 10,
 ) -> List[ChunkWithScore]:
     """Stage 1: Embed query, then ChromaDB similarity search."""
     q_embedding = await embed_query(query_text)
-    results = query_by_embedding(q_embedding, document_ids=document_ids, n_results=top_k)
+    results = query_by_embedding(
+        q_embedding,
+        document_ids=document_ids,
+        owner_id=owner_id,
+        n_results=top_k,
+    )
 
     chunks = []
     if results["ids"] and results["ids"][0]:

@@ -41,6 +41,7 @@ def add_chunks(
     metadatas: list[dict],
     embeddings: list[list[float]],
     document_name: str,
+    owner_id: str = "public",
 ) -> int:
     """Add chunks with pre-computed embeddings to ChromaDB."""
     collection = get_collection()
@@ -49,6 +50,7 @@ def add_chunks(
     for meta in metadatas:
         meta["document_name"] = document_name
         meta["document_id"] = document_id
+        meta["owner_id"] = owner_id
 
     if ids:
         collection.add(ids=ids, documents=texts, metadatas=metadatas, embeddings=embeddings)
@@ -59,6 +61,7 @@ def add_chunks(
 def query_by_embedding(
     query_embedding: list[float],
     document_ids: list[str] | None = None,
+    owner_id: str = "public",
     n_results: int = 10,
 ) -> dict:
     """Query by pre-computed embedding vector. Returns empty result if collection is empty."""
@@ -69,7 +72,10 @@ def query_by_embedding(
     if count == 0:
         return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 
-    where_filter = {"document_id": {"$in": document_ids}} if document_ids else None
+    filters = [{"owner_id": owner_id}]
+    if document_ids:
+        filters.append({"document_id": {"$in": document_ids}})
+    where_filter = filters[0] if len(filters) == 1 else {"$and": filters}
     actual_n = max(1, min(n_results, count))
 
     return collection.query(
@@ -80,11 +86,13 @@ def query_by_embedding(
     )
 
 
-def delete_document_chunks(document_id: str) -> int:
+def delete_document_chunks(document_id: str, owner_id: str = "public") -> int:
     """Delete all chunks for a document. Returns count deleted, or raises on storage error."""
     collection = get_collection()
     try:
-        results = collection.get(where={"document_id": document_id})
+        results = collection.get(
+            where={"$and": [{"document_id": document_id}, {"owner_id": owner_id}]}
+        )
         if results["ids"]:
             collection.delete(ids=results["ids"])
             return len(results["ids"])
@@ -92,3 +100,47 @@ def delete_document_chunks(document_id: str) -> int:
     except Exception as e:
         logger.error(f"Failed to delete chunks for document {document_id}: {e}")
         raise  # Don't swallow storage errors — let the caller decide
+
+
+def get_document_chunks(document_id: str, owner_id: str = "public") -> list[dict]:
+    """Return stored chunks for a document, ordered by chunk index."""
+    collection = get_collection()
+    results = collection.get(
+        where={"$and": [{"document_id": document_id}, {"owner_id": owner_id}]},
+        include=["documents", "metadatas"],
+    )
+    rows = []
+    for i, chunk_id in enumerate(results.get("ids", [])):
+        metadata = results.get("metadatas", [])[i] or {}
+        rows.append(
+            {
+                "id": chunk_id,
+                "text": results.get("documents", [])[i] or "",
+                "chunk_index": metadata.get("chunk_index", 0),
+                "page_number": metadata.get("page_number"),
+            }
+        )
+    return sorted(rows, key=lambda row: row["chunk_index"])
+
+
+def rename_document_chunks(
+    document_id: str,
+    owner_id: str,
+    document_name: str,
+) -> int:
+    """Update the display name stored in chunk metadata."""
+    collection = get_collection()
+    results = collection.get(
+        where={"$and": [{"document_id": document_id}, {"owner_id": owner_id}]},
+        include=["metadatas"],
+    )
+    ids = results.get("ids", [])
+    if not ids:
+        return 0
+    metadatas = []
+    for metadata in results.get("metadatas", []):
+        updated = dict(metadata or {})
+        updated["document_name"] = document_name
+        metadatas.append(updated)
+    collection.update(ids=ids, metadatas=metadatas)
+    return len(ids)
