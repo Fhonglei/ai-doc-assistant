@@ -20,13 +20,10 @@ export function useDocuments() {
 
   const fetched = useRef(false);
 
-  // Fetch documents once on mount
-  useEffect(() => {
-    if (fetched.current) return;
-    fetched.current = true;
-
-    const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(
+    async () => {
       setLoading(true);
+      setError(null);
       try {
         const result = await api.listDocuments();
         setDocuments(result.documents);
@@ -36,9 +33,16 @@ export function useDocuments() {
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [setDocuments, setLoading, setError]
+  );
+
+  // Fetch documents once on mount
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
     fetchDocuments();
-  }, [setDocuments, setLoading, setError]);
+  }, [fetchDocuments]);
 
   const upload = useCallback(
     async (file: File) => {
@@ -48,16 +52,26 @@ export function useDocuments() {
         return;
       }
 
-      addUpload(file);
-      updateUploadProgress(file.name, 30);
+      const uploadId = addUpload(file);
+      updateUploadProgress(uploadId, 30);
+      updateUploadStatus(uploadId, "processing");
 
       try {
         const doc = await api.uploadDocument(file);
-        updateUploadStatus(file.name, "ready", doc);
-        setTimeout(() => removeUpload(file.name), 3000);
+        updateUploadProgress(uploadId, 100);
+
+        if (doc.status === "ready") {
+          updateUploadStatus(uploadId, "ready", doc);
+          setTimeout(() => removeUpload(uploadId), 3000);
+        } else {
+          const message = doc.error_message || "Document processing failed";
+          updateUploadStatus(uploadId, "error", doc, message);
+          setError(message);
+        }
       } catch (err: unknown) {
         const e = err as Error;
-        updateUploadStatus(file.name, "error", undefined, e.message);
+        updateUploadStatus(uploadId, "error", undefined, e.message);
+        setError(e.message || "Upload failed");
       }
     },
     [addUpload, updateUploadProgress, updateUploadStatus, removeUpload, setError]
@@ -83,9 +97,7 @@ export function useDocuments() {
     error,
     upload,
     remove,
-    refresh: () => {
-      fetched.current = false;
-    },
+    refresh: fetchDocuments,
     clearError: () => setError(null),
   };
 }

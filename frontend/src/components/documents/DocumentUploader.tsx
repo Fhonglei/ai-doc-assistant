@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { RefObject } from "react";
 
 interface UploadEntry {
+  id: string;
   file: File;
   progress: number;
   status: string;
@@ -75,7 +76,7 @@ export function DocumentUploader({ onUpload, uploads, inputRef }: DocumentUpload
         <ul className="mt-2 space-y-1">
           {uploads.map((u) => (
             <li
-              key={u.file.name}
+              key={u.id}
               className="flex items-center gap-2 rounded-lg bg-surface-muted px-2 py-1.5 text-[10px]"
             >
               <span className="text-muted">

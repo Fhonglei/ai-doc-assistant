@@ -3,7 +3,6 @@
 import uuid
 import json
 from datetime import datetime, timezone
-from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,10 +10,6 @@ from fastapi.responses import StreamingResponse
 from app.models.chat import (
     ChatRequest,
     ChatResponse,
-    Source,
-    MessageOut,
-    ConversationOut,
-    ConversationCreateOut,
 )
 from app.core.retriever import retrieve_candidates, rerank_with_llm
 from app.core.generator import generate_answer, generate_stream
@@ -60,15 +55,21 @@ async def send_message(request: ChatRequest):
     user_msg_id = str(uuid.uuid4())
     await add_message(user_msg_id, conv_id, "user", request.query.strip(), created_at=now)
 
-    # Retrieve (ChromaDB auto-embeds the query)
+    document_ids = request.document_ids or None
+
+    # Retrieve relevant chunks for the query.
     candidates = await retrieve_candidates(
         request.query.strip(),
-        document_ids=request.document_ids,
-        top_k=10,
+        document_ids=document_ids,
+        top_k=settings.retrieval_top_k,
     )
 
     # Rerank
-    top_chunks = await rerank_with_llm(request.query.strip(), candidates, top_k=4)
+    top_chunks = await rerank_with_llm(
+        request.query.strip(),
+        candidates,
+        top_k=settings.rerank_top_k,
+    )
 
     if request.stream:
         return await _stream_response(request.query.strip(), top_chunks, conv_id, history)
@@ -108,16 +109,23 @@ async def _stream_response(
         full_text = ""
         try:
             async for sse_event in generate_stream(query, chunks, history):
-                # Pass through chunk events
-                if "chunk" in sse_event:
-                    # Extract content to accumulate
+                event = None
+                if sse_event.startswith("data: "):
                     try:
-                        data = json.loads(sse_event.replace("data: ", ""))
-                        if data.get("type") == "chunk":
-                            full_text += data.get("content", "")
+                        event = json.loads(sse_event[6:].strip())
                     except json.JSONDecodeError:
-                        pass
-                yield sse_event
+                        event = None
+
+                if event and event.get("type") == "chunk":
+                    full_text += event.get("content", "")
+                    yield sse_event
+                elif event and event.get("type") == "error":
+                    yield sse_event
+                    return
+                elif event and event.get("type") == "done":
+                    continue
+                else:
+                    yield sse_event
 
             # After streaming complete, extract sources and send them
             if full_text:

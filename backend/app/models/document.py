@@ -1,7 +1,7 @@
 """Document-related Pydantic schemas."""
 
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class DocumentOut(BaseModel):

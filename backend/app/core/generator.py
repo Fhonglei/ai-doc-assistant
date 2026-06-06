@@ -99,7 +99,7 @@ async def generate_stream(
     chunks: List[ChunkWithScore],
     conversation_history: Optional[List[MessageOut]] = None,
 ) -> AsyncIterator[str]:
-    """Streaming generation. Yields SSE event strings."""
+    """Streaming generation. Yields chunk/error SSE event strings."""
     system_msg, user_msg = build_prompt(query, chunks, conversation_history)
 
     async with httpx.AsyncClient() as client:
@@ -120,11 +120,10 @@ async def generate_stream(
             timeout=120.0,
         ) as response:
             if response.status_code != 200:
-                body = await response.aread()
+                await response.aread()
                 yield f'data: {{"type":"error","message":"LLM API error: {response.status_code}"}}\n\n'
                 return
 
-            full_text = ""
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
                     data_str = line[6:]
@@ -135,14 +134,10 @@ async def generate_stream(
                         delta = data.get("choices", [{}])[0].get("delta", {})
                         content = delta.get("content", "")
                         if content:
-                            full_text += content
                             event = json.dumps({"type": "chunk", "content": content})
                             yield f"data: {event}\n\n"
                     except json.JSONDecodeError:
                         continue
-
-            # Signal completion
-            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text})}\n\n"
 
 
 def _get_chat_url() -> str:

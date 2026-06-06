@@ -37,7 +37,7 @@ class ConversationOut(BaseModel):
     conversation_id: str
     title: Optional[str] = None
     created_at: str
-    messages: List[MessageOut] = []
+    messages: List[MessageOut] = Field(default_factory=list)
 
 
 class ConversationListItem(BaseModel):

@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
   variable: "--font-sans",
+  display: "swap",
+});
+
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -20,7 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={`h-full ${dmSans.variable}`} suppressHydrationWarning>
+    <html
+      lang="zh-CN"
+      className={`h-full ${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="h-full overflow-hidden">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

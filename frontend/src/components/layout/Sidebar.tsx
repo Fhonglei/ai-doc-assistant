@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useDocuments } from "@/hooks/useDocuments";
+import { useDocumentStore } from "@/stores/document-store";
 import { DocumentUploader } from "@/components/documents/DocumentUploader";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { formatDateShort } from "@/lib/formatters";
@@ -25,6 +26,8 @@ export function Sidebar({
   onNewConversation,
 }: SidebarProps) {
   const { documents, uploads, upload, remove } = useDocuments();
+  const selectedIds = useDocumentStore((s) => s.selectedDocumentIds);
+  const toggleSelection = useDocumentStore((s) => s.toggleDocumentSelection);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -100,6 +103,8 @@ export function Sidebar({
         />
         <DocumentList
           documents={documents}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelection}
           onDelete={remove}
         />
       </div>

@@ -6,13 +6,23 @@ import { useDocumentStore } from "@/stores/document-store";
 import { DocumentUploader } from "@/components/documents/DocumentUploader";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { IconFile } from "@/components/common/Icons";
+import { ErrorBanner } from "@/components/common/ErrorBanner";
 
 interface DocumentsPanelProps {
   onClose?: () => void;
 }
 
 export function DocumentsPanel({ onClose }: DocumentsPanelProps) {
-  const { documents, uploads, upload, remove, isLoading } = useDocuments();
+  const {
+    documents,
+    uploads,
+    upload,
+    remove,
+    refresh,
+    clearError,
+    isLoading,
+    error,
+  } = useDocuments();
   const selectedIds = useDocumentStore((s) => s.selectedDocumentIds);
   const toggleSelection = useDocumentStore((s) => s.toggleDocumentSelection);
   const selectAll = useDocumentStore((s) => s.selectAllDocuments);
@@ -44,6 +54,12 @@ export function DocumentsPanel({ onClose }: DocumentsPanelProps) {
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
         <DocumentUploader onUpload={upload} uploads={uploads} inputRef={uploadInputRef} />
+
+        {error && (
+          <div className="mb-3">
+            <ErrorBanner message={error} onDismiss={clearError} onRetry={refresh} />
+          </div>
+        )}
 
         {readyCount > 0 && (
           <div className="mb-2 flex items-center justify-between gap-2 px-1">

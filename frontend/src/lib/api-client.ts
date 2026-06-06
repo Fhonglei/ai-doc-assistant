@@ -12,6 +12,62 @@ import type {
 } from "./types";
 import type { SSEEvent } from "./types";
 
+type ApiErrorBody = {
+  detail?: string | { message?: string };
+  error?: { message?: string; code?: string };
+  message?: string;
+};
+
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  if (!text) return `${fallback} (${res.status})`;
+
+  try {
+    const body = JSON.parse(text) as ApiErrorBody;
+    if (typeof body.detail === "string") return body.detail;
+    if (body.detail?.message) return body.detail.message;
+    if (body.error?.message) return body.error.message;
+    if (body.message) return body.message;
+  } catch {
+    // Plain text response body; fall through below.
+  }
+
+  return text || `${fallback} (${res.status})`;
+}
+
+async function ensureOk(res: Response, fallback: string): Promise<void> {
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, fallback));
+  }
+}
+
+function consumeSSEFrames(
+  buffer: string,
+  onEvent: (event: SSEEvent) => void
+): string {
+  const frames = buffer.split(/\r?\n\r?\n/);
+  const remainder = frames.pop() || "";
+
+  for (const frame of frames) {
+    const data = frame
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n")
+      .trim();
+
+    if (!data || data === "[DONE]") continue;
+
+    try {
+      onEvent(JSON.parse(data) as SSEEvent);
+    } catch {
+      // Ignore malformed SSE payloads while keeping the stream alive.
+    }
+  }
+
+  return remainder;
+}
+
 // --- Health ---
 
 export async function checkHealth(): Promise<{ status: string }> {
@@ -19,7 +75,7 @@ export async function checkHealth(): Promise<{ status: string }> {
     method: "GET",
     cache: "no-store",
   });
-  if (!res.ok) throw new Error("Backend unavailable");
+  await ensureOk(res, "Backend unavailable");
   return res.json();
 }
 
@@ -34,23 +90,20 @@ export async function uploadDocument(file: File): Promise<Document> {
     body: formData,
   });
 
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Upload failed (${res.status})`);
-  }
+  await ensureOk(res, "Upload failed");
 
   return res.json();
 }
 
 export async function listDocuments(): Promise<DocumentList> {
   const res = await fetch(`${API_BASE_URL}/api/v1/documents`);
-  if (!res.ok) throw new Error("Failed to fetch documents");
+  await ensureOk(res, "Failed to fetch documents");
   return res.json();
 }
 
 export async function getDocument(id: string): Promise<Document> {
   const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`);
-  if (!res.ok) throw new Error("Document not found");
+  await ensureOk(res, "Document not found");
   return res.json();
 }
 
@@ -58,7 +111,7 @@ export async function deleteDocument(id: string): Promise<DeleteResponse> {
   const res = await fetch(`${API_BASE_URL}/api/v1/documents/${id}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error("Failed to delete document");
+  await ensureOk(res, "Failed to delete document");
   return res.json();
 }
 
@@ -76,10 +129,7 @@ export async function sendChatMessage(
     signal,
   });
 
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Chat request failed (${res.status})`);
-  }
+  await ensureOk(res, "Chat request failed");
 
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Response body is not readable");
@@ -93,21 +143,12 @@ export async function sendChatMessage(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      buffer = consumeSSEFrames(buffer, onEvent);
+    }
 
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const dataStr = line.slice(6).trim();
-          if (!dataStr) continue;
-          try {
-            const event: SSEEvent = JSON.parse(dataStr);
-            onEvent(event);
-          } catch {
-            // Skip unparseable lines
-          }
-        }
-      }
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      consumeSSEFrames(`${buffer}\n\n`, onEvent);
     }
   } finally {
     reader.releaseLock();
@@ -123,10 +164,7 @@ export async function sendChatMessageNonStreaming(
     body: JSON.stringify({ ...request, stream: false }),
   });
 
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Chat request failed (${res.status})`);
-  }
+  await ensureOk(res, "Chat request failed");
 
   return res.json();
 }
@@ -137,19 +175,19 @@ export async function createConversation(): Promise<{ conversation_id: string }>
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error("Failed to create conversation");
+  await ensureOk(res, "Failed to create conversation");
   return res.json();
 }
 
 export async function listConversations(): Promise<ConversationList> {
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations`);
-  if (!res.ok) throw new Error("Failed to fetch conversations");
+  await ensureOk(res, "Failed to fetch conversations");
   return res.json();
 }
 
 export async function getConversation(id: string): Promise<Conversation> {
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations/${id}`);
-  if (!res.ok) throw new Error("Conversation not found");
+  await ensureOk(res, "Conversation not found");
   return res.json();
 }
 
@@ -157,5 +195,5 @@ export async function deleteConversation(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/v1/conversations/${id}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error("Failed to delete conversation");
+  await ensureOk(res, "Failed to delete conversation");
 }

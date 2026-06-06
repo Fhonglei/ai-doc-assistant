@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Document } from "@/lib/types";
 
 interface UploadEntry {
+  id: string;
   file: File;
   progress: number; // 0-100
   status: "uploading" | "processing" | "ready" | "error";
@@ -21,18 +22,24 @@ interface DocumentState {
   toggleDocumentSelection: (id: string) => void;
   selectAllDocuments: () => void;
   clearDocumentSelection: () => void;
-  addUpload: (file: File) => void;
-  updateUploadProgress: (fileName: string, progress: number) => void;
+  addUpload: (file: File) => string;
+  updateUploadProgress: (id: string, progress: number) => void;
   updateUploadStatus: (
-    fileName: string,
+    id: string,
     status: UploadEntry["status"],
     document?: Document,
     error?: string
   ) => void;
-  removeUpload: (fileName: string) => void;
+  removeUpload: (id: string) => void;
   removeDocument: (id: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+}
+
+let uploadIdCounter = 0;
+function genUploadId(file: File): string {
+  uploadIdCounter += 1;
+  return `upload_${Date.now()}_${uploadIdCounter}_${file.size}`;
 }
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
@@ -67,34 +74,37 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   clearDocumentSelection: () => set({ selectedDocumentIds: [] }),
 
-  addUpload: (file) =>
+  addUpload: (file) => {
+    const id = genUploadId(file);
     set((state) => ({
       uploads: [
         ...state.uploads,
-        { file, progress: 0, status: "uploading" },
+        { id, file, progress: 0, status: "uploading" },
       ],
-    })),
+    }));
+    return id;
+  },
 
-  updateUploadProgress: (fileName, progress) =>
+  updateUploadProgress: (id, progress) =>
     set((state) => ({
       uploads: state.uploads.map((u) =>
-        u.file.name === fileName ? { ...u, progress } : u
+        u.id === id ? { ...u, progress } : u
       ),
     })),
 
-  updateUploadStatus: (fileName, status, document, error) =>
+  updateUploadStatus: (id, status, document, error) =>
     set((state) => ({
       uploads: state.uploads.map((u) =>
-        u.file.name === fileName ? { ...u, status, document, error } : u
+        u.id === id ? { ...u, status, document, error } : u
       ),
       documents: document
-        ? [document, ...state.documents]
+        ? [document, ...state.documents.filter((d) => d.id !== document.id)]
         : state.documents,
     })),
 
-  removeUpload: (fileName) =>
+  removeUpload: (id) =>
     set((state) => ({
-      uploads: state.uploads.filter((u) => u.file.name !== fileName),
+      uploads: state.uploads.filter((u) => u.id !== id),
     })),
 
   removeDocument: (id) =>
