@@ -1,17 +1,19 @@
 # AI Document Assistant
 
+[![CI](https://github.com/Fhonglei/ai-doc-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Fhonglei/ai-doc-assistant/actions/workflows/ci.yml)
+
 A full-stack RAG document Q&A app for uploading PDF, DOCX, and TXT files, asking natural-language questions, and receiving streaming answers with source citations.
 
 This project is designed as a portfolio-grade AI application: it includes document ingestion, vector search, citation-aware generation, conversation history, optional login, user-level data isolation, Docker Compose, deployment configuration, backend tests, and a small RAG evaluation harness.
 
 ## Demo
 
-Add your deployed links here after release:
+- Frontend: https://frontend-fhongleis-projects.vercel.app
+- Backend health check: https://mindful-determination-production-e41c.up.railway.app/api/health
+- Demo script: `docs/DEMO_SCRIPT.md`
+- Production checklist: `docs/PRODUCTION_CHECKLIST.md`
 
-- Frontend: `https://your-vercel-app.vercel.app`
-- Backend health check: `https://your-render-service.onrender.com/api/health`
-- Demo video/GIF: `docs/demo.gif`
-- Screenshot: `docs/app-screenshot.png`
+The deployed backend will report `degraded` until `DEEPSEEK_API_KEY` or `OPENAI_API_KEY` is configured.
 
 ## Highlights
 
@@ -31,7 +33,7 @@ Add your deployed links here after release:
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 14, React, Tailwind CSS, Zustand |
+| Frontend | Next.js 15, React, Tailwind CSS, Zustand |
 | Backend | FastAPI, Pydantic, SQLite, ChromaDB |
 | AI | DeepSeek/OpenAI-compatible chat API, sentence-transformers |
 | Retrieval | Chunking, embeddings, vector search, LLM reranking |
@@ -141,6 +143,7 @@ Frontend checks:
 ```bash
 cd frontend
 npm run lint
+npm run typecheck
 npm run build
 ```
 

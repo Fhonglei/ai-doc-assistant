@@ -8,6 +8,8 @@ dist/
 venv/
 env/
 *.so
+.pytest_cache/
+pytest-cache-files-*/
 
 # Node
 node_modules/
