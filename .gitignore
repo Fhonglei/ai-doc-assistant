@@ -20,6 +20,17 @@ out/
 .env
 .env.local
 .env.*.local
+*.env
+.env*
+**/.env
+**/.env*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+.vercel/
+frontend/.vercel/
+backend/.vercel/
 
 # IDE
 .idea/

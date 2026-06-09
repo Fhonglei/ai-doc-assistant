@@ -12,17 +12,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
-
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/src/app/fonts ./src/app/fonts
-
-EXPOSE 3000
-
-CMD ["npm", "run", "start"]
+FROM nginx:1.27-alpine AS runner
+COPY --from=builder /app/out /usr/share/nginx/html
+EXPOSE 80

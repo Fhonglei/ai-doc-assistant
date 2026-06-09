@@ -1,6 +1,6 @@
 """Auth-related Pydantic schemas."""
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UserOut(BaseModel):
@@ -9,13 +9,26 @@ class UserOut(BaseModel):
     created_at: str
 
 
-class RegisterRequest(BaseModel):
-    email: EmailStr
+class EmailRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if " " in email or "@" not in email:
+            raise ValueError("Enter a valid email address.")
+        local, _, domain = email.partition("@")
+        if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+            raise ValueError("Enter a valid email address.")
+        return email
+
+
+class RegisterRequest(EmailRequest):
     password: str = Field(min_length=8, max_length=128)
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
+class LoginRequest(EmailRequest):
     password: str
 
 

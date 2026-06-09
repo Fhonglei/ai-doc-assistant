@@ -1,4 +1,4 @@
-"""AI Document Assistant — FastAPI Application Entry Point."""
+"""AI Document Assistant FastAPI application entry point."""
 
 import os
 import logging
