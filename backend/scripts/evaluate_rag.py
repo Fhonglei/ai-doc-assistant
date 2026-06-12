@@ -1,4 +1,4 @@
-"""Small RAG evaluation runner for portfolio demos.
+"""Small RAG evaluation runner for project demos.
 
 Default mode runs a fast offline lexical retrieval check over sample docs.
 Pass --backend-url to upload the samples and evaluate live API answers.

@@ -24,7 +24,7 @@ def make_client(monkeypatch):
                 chunk_id="doc1_0",
                 document_id="doc1",
                 document_name="handbook.txt",
-                text="Internship applications should include project demos.",
+                text="Public project pages should include project demos.",
                 chunk_index=0,
                 page_number=1,
                 similarity_score=0.9,
@@ -35,7 +35,7 @@ def make_client(monkeypatch):
         return candidates[:top_k]
 
     async def fake_generate_answer(query, chunks, history):
-        return "Include a deployed demo in your internship application [1]."
+        return "Include a deployed demo on the public project page [1]."
 
     monkeypatch.setattr(chat.settings, "deepseek_api_key", "sk-test")
     monkeypatch.setattr(chat, "create_conversation", fake_create_conversation)
@@ -53,7 +53,7 @@ def test_chat_send_non_streaming_returns_citations(monkeypatch):
 
     response = client.post(
         "/api/v1/chat/send",
-        json={"query": "How should I use this for internships?", "stream": False},
+        json={"query": "How should I present this project?", "stream": False},
     )
 
     assert response.status_code == 200

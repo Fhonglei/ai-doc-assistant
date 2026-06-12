@@ -4,7 +4,7 @@
 
 A full-stack RAG document Q&A app for uploading PDF, DOCX, and TXT files, asking natural-language questions, and receiving streaming answers with source citations.
 
-This project is designed as a portfolio-grade AI application: it includes document ingestion, vector search, citation-aware generation, conversation history, optional login, user-level data isolation, Docker Compose, deployment configuration, backend tests, and a small RAG evaluation harness.
+This project is a full-stack AI application with document ingestion, vector search, citation-aware generation, conversation history, optional login, user-level data isolation, Docker Compose, deployment configuration, backend tests, and a small RAG evaluation harness.
 
 ## Demo
 
@@ -207,12 +207,6 @@ After the backend URL is known, redeploy the frontend so the public API URL is b
 - Uploaded files are size and type checked before ingestion.
 - Security headers are added by FastAPI middleware.
 - Use a long random `AUTH_SECRET_KEY` in production.
-
-## Resume Description
-
-AI Document Assistant | Next.js, FastAPI, ChromaDB, DeepSeek/OpenAI, RAG
-
-Built a full-stack RAG document Q&A system supporting PDF/DOCX/TXT upload, asynchronous ingestion, semantic retrieval, streaming AI responses, citation-backed answers, conversation history, optional authentication, per-user data isolation, Docker Compose, deployment configuration, automated backend tests, and a small RAG evaluation harness.
 
 ## Project Structure
 

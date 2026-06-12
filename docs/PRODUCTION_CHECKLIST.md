@@ -17,7 +17,7 @@ This checklist separates what is already implemented from what still needs real 
 - RAG evaluation scaffold with sample documents.
 - GitHub Actions CI for backend tests and frontend lint/typecheck/build.
 
-## Required Before Resume Demo
+## Required Before Demo
 
 - Set `DEEPSEEK_API_KEY` on Railway.
 - Confirm health check returns `"llm_configured": true`.
@@ -37,17 +37,3 @@ This checklist separates what is already implemented from what still needs real 
 - Add rate limiting for upload and chat endpoints.
 - Add Sentry or another error monitoring service.
 - Add CI deployment status badges to README after GitHub Actions runs.
-
-## Resume-Ready Claim
-
-Accurate:
-
-> Built and deployed a full-stack RAG document assistant with document ingestion, semantic retrieval, citation-backed chat, async processing, document management, optional authentication, Docker Compose, CI, and RAG evaluation scaffolding.
-
-Avoid overstating:
-
-> Fully production-ready SaaS.
-
-Better wording:
-
-> Portfolio-ready prototype with clear production hardening path.
